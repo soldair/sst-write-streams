@@ -1,0 +1,25 @@
+{
+  "name": "sst-write-streams",
+  "description": "create write streams that append to/create SST (Sorted String Tables).",
+  "version": "0.0.0",
+  "repository": {
+    "url": "git://github.com/soldair/sst-write-streams.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "author": "Ryan Day",
+  "dependencies": {
+    "monotonic-timestamp": "0.0.8",
+    "through": "~2.3.4",
+    "sorted-key-buckets": "0.0.0",
+    "mergesort-stream": "0.0.1",
+    "shasum": "~1.0.0",
+    "json-buffer": "~2.0.5"
+  },
+  "devDependencies": {
+    "tape": "~1.0.4",
+    "split": "~0.2.6"
+  }
+}
