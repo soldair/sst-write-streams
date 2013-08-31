@@ -20,6 +20,7 @@ function dataloop(key,stream,limit,cb){
   var c = 0;
   (function fn(){
     t++;
+    c++;
     if(!stream.write(data(key))){
       return stream.once('drain',function(){
         fn();
@@ -29,7 +30,7 @@ function dataloop(key,stream,limit,cb){
     if(t == limit) return cb();
 
     if(c < 100) fn();
-    else process.nextTick(function(){
+    else setImmediate(function(){
       c = 0;
       fn();
     });

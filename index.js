@@ -1,10 +1,28 @@
+/*
+what are the results of this lib
+
+write sorted data to disk.
+
+specify how large a sst file may be. 
+  files will almost always be one key value pair larger than limit in bytes.
+
+only open a set number of file descriptors to "incomplete" files
+  this means that if i have 4 files and 4 is the configured limit i must compact the files into one
+
+
+writes always work so i will open file descriptors beyond the limit if pause is not respected.
+
+
+*/
+
+
 
 var fs = require('fs')
 , EventEmitter = require('events').EventEmitter
 , sortedbuckets = require('sorted-key-buckets') 
 , monotonic = require('monotonic-timestamp')
 , through = require('through')
-, mergesort = require('mergesort-stream')
+, compaction = require('./compaction')
 
 var fileId = 0;
 
@@ -23,12 +41,17 @@ module.exports = function(path,stream,options){
     stream = false;
   }
 
-  if(options.serializer === undefined) options.serializer = JSON.stringify;//jsonb.stringify;
+  if(options.serializer === undefined) options.serializer = JSON.stringify;
 
   em.tables = [];
   em.compacting = false;
+  em.lastWrite = 0; // can be used to implement snapshotting
+
+  // compact at 4 files.
+  // keep biggering and biggering. for now.
 
   var serializer = options.serializer;
+
   if(!stream) stream = function(path){
     var ws = fs.createWriteStream(path,'a+');
     return ws;
@@ -40,7 +63,7 @@ module.exports = function(path,stream,options){
     var streams = {}
     , s = through(function(obj){ 
       var z = this;
-      obj.t = monotonic()
+      em.lastWrite = obj.t = monotonic()
       
       //if(obj.batch) ... this is cool
       //deletes just have no value.
@@ -52,9 +75,11 @@ module.exports = function(path,stream,options){
       z.count++;
 
       if(!range[1]) {
+        // if the stream is already
         var fpath = path+'/sst.'+(++fileId);
         range[1] = stream(fpath);
         range[1].sstpath = fpath;
+        range[1].startKey = obj.key;
       }
 
       if(!streams[range[1].sstpath]) refStream(range[1].sstpath,range[1]);
@@ -94,7 +119,7 @@ module.exports = function(path,stream,options){
           }
         }
       };
-      // handle listener warning as each active write stream will need a handle to each sst write stream it refrences
+      // handle listener warning as each active write stream will need a listener bound to each sst write stream it refrences
       ws.setMaxListeners(Infinity);
       ws.on('drain',streams[path].events.drain).on('end',streams[path].events.end);
     }
