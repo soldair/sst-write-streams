@@ -13,13 +13,13 @@
   "dependencies": {
     "monotonic-timestamp": "0.0.8",
     "through": "~2.3.4",
-    "sorted-key-buckets": "0.0.0",
-    "mergesort-stream": "0.0.1",
+    "sorted-key-buckets": "~0.0.2",
+    "mergesort-stream": "~0.0.1",
     "shasum": "~1.0.0",
-    "json-buffer": "~2.0.5"
+    "json-buffer": "~2.0.5",
+    "split": "~0.2.6"
   },
   "devDependencies": {
-    "tape": "~1.0.4",
-    "split": "~0.2.6"
+    "tape": "~1.0.4"
   }
 }

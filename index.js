@@ -43,18 +43,57 @@ module.exports = function(path,stream,options){
 
   if(options.serializer === undefined) options.serializer = JSON.stringify;
 
+  // before compaction i will allow up to 10 open sst streams
+  options.openTables = options.openTables||10;
+  // when i reach openTables limit 
+  // i will check if i have compactions running.
+  // if i can start a compaction i do.
+  // all tables being compacted are removed from openTables
+  // if i still excede openTables i will pause the external writeable stream.
+  options.concurrentCompactions = options.concurrentCompactions||1;
+
   em.tables = [];
   em.compacting = false;
   em.lastWrite = 0; // can be used to implement snapshotting
 
-  // compact at 4 files.
-  // keep biggering and biggering. for now.
+
+  em.writing = [];
 
   var serializer = options.serializer;
 
   if(!stream) stream = function(path){
     var ws = fs.createWriteStream(path,'a+');
     return ws;
+  }
+
+  em.batch = function(){
+
+  }
+
+  em.del = function(){
+
+  }
+
+  em.put = function(k,v,cb){
+    
+  }
+
+  em._getStream = function(){
+    // if the stream is already
+    var fpath = path+'/sst.'+(++fileId);
+    var s = stream(fpath);
+    s.sstpath = fpath; 
+    return s;
+  }
+
+  em._checkCompaction = function(){
+    var z = this;
+    // time to grow up boss
+    if(z.tables.length > options.openTables) {
+      
+      z.compact();
+      
+    }
   }
 
   // compaction options.  
@@ -71,20 +110,31 @@ module.exports = function(path,stream,options){
       var range = sortedbuckets(obj.key,em.tables);
       if(serializer) obj = serializer(obj);
 
-      z.bytes += obj.length||0;
-      z.count++;
 
       if(!range[1]) {
-        // if the stream is already
-        var fpath = path+'/sst.'+(++fileId);
-        range[1] = stream(fpath);
-        range[1].sstpath = fpath;
+
+        em._checkCompaction();
+
+        range[1] = em._getStream();
         range[1].startKey = obj.key;
+        range[1].bytes = 0;
+
+        if(em.tables.length > options.openTables) {
+          console.log('paused');
+          z.pause();
+        }
+
+
       }
 
+      range[1].bytes = z.bytes += obj.length||0;
+      range[1].count++;
+      z.count++;
+      
+      range[1].endKey = obj.key;
       if(!streams[range[1].sstpath]) refStream(range[1].sstpath,range[1]);
 
-      // must write this tick.
+      // must write this turn.
       if(!range[1].write(obj+"\n")) {
         paused = true;
         if(!streams[range[1].sstpath].paused) {
@@ -139,7 +189,116 @@ module.exports = function(path,stream,options){
       delete streams[path];
     }
 
+    em.on('compaction',function(){
+      console.log('compaction',arguments);
+      process.nextTick(function(){
+        if(s.paused) s.resume();
+      });
+    })
+
     return s
+  }
+
+  em.compact = function(cb){
+
+    var z = this;
+    if(z.compacting) {
+      console.log('compaction queued');
+      return z.compacting.push(cb);
+    }
+    // look at open tables array
+    // take all tables that are open and remove them from the array
+    var tables = z.tables;
+    z.tables = [];
+
+    var rs = options.readStream|| fs.createReadStream
+    , closes = 0
+    , streams = 0
+    , readable = []
+    , closed = function(){
+      // create read streams to all of them.
+      // get a new writeable stream
+
+      // pass source readable streams to compaction piped to writeable
+      
+      compaction(readable)
+      .pipe(em._getStream()).on('close',function(){
+        var resultStream = this;
+
+        // on end add writeable stream back to tables.
+        // emit compaction {table: start: end:}
+        //
+        // add table
+        sortedbuckets.insert([this.endKey,this],z.tables);
+        // unlink the original tables.
+ 
+       
+        var todo = tables.length;
+        for( var i=0;i<tables.length;++i){
+          var errors = [];
+          fs.unlink(tables[i][1].sstpath,function(err){
+            if(err) errors.push(err)
+            if(--todo) return;
+            if(cb) cb(errors.length?errors:false,resultStream); 
+
+            var cbs = em.compacting;
+            em.compacting = false;
+
+            z.emit('compaction',{table:this.sstpath,start:this.startKey,end:this.endKey});
+            if(cbs.length) {
+              // if compaction was queued. do one more.
+              em.compact(function(err,data){
+                while(cbs.length) { 
+                  if(cb) cbs.shift()(err,data);
+                }
+              });
+            }
+
+          });
+        }
+
+        
+        
+      })
+
+    }
+
+    if(tables.length < 2) return process.nextTick(function(){
+      cb(false,false);
+    }); 
+
+
+    em.compacting = [];
+
+    // all tables should be open streams.
+    for(var i=0;i<tables.length;++i){
+      if(!tables[i][1]) continue;
+      streams++;
+      // call end on the streams which removes them as write targets from input write data.
+      tables[i][1].once('close',function(){
+
+        console.log('sstpath ',this.sstpath);
+        // get a readble stream to each table
+        readable.push(rs(this.sstpath));
+        closes++;
+        if(closes != streams) return;
+        closed();
+      }).end();
+    }
+
+
+  }
+
+  em.end = function(cb){
+    // prevent new write streams.
+    // end all write streams
+    // compact
+    // cb
+    // emit close.
+  }
+
+  em._parseStream = function(){
+
   }
 
   return em;
