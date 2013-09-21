@@ -62,6 +62,7 @@ module.exports = function(path,stream,options){
   var serializer = options.serializer;
 
   if(!stream) stream = function(path){
+    console.log('openeing write stream ',path)
     var ws = fs.createWriteStream(path,'a+');
     return ws;
   }
@@ -119,7 +120,7 @@ module.exports = function(path,stream,options){
         range[1].startKey = obj.key;
         range[1].bytes = 0;
 
-        if(em.tables.length > options.openTables) {
+        if(em.compacting) {
           console.log('paused');
           z.pause();
         }
@@ -135,6 +136,7 @@ module.exports = function(path,stream,options){
       if(!streams[range[1].sstpath]) refStream(range[1].sstpath,range[1]);
 
       // must write this turn.
+      console.log('writing ',range[1])
       if(!range[1].write(obj+"\n")) {
         paused = true;
         if(!streams[range[1].sstpath].paused) {
@@ -269,11 +271,11 @@ module.exports = function(path,stream,options){
 
 
     em.compacting = [];
-
     // all tables should be open streams.
     for(var i=0;i<tables.length;++i){
       if(!tables[i][1]) continue;
       streams++;
+      console.log('closing table ',i,tables[i][1])
       // call end on the streams which removes them as write targets from input write data.
       tables[i][1].once('close',function(){
 
