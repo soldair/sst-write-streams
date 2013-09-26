@@ -5,8 +5,8 @@ var simple = require('../simple')
 test('can write data simply',function(t){
   var dir = __dirname+'/db'  
 
-  //var writer = simple(dir,JSON.stringify,JSON.parse,function(o1,o2){
-  var writer = simple(dir,msgpack.encode,msgpack.decode,function(o1,o2){
+  var writer = simple(dir,JSON.stringify,JSON.parse,function(o1,o2){
+  //var writer = simple(dir,msgpack.encode,msgpack.decode,function(o1,o2){
     if(o1.key > o2.key) return 1;
     else if(o1.key < o2.key) return -1;
     else {
