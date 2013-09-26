@@ -41,12 +41,12 @@ module.exports = function(dir,serializer,deserializer,comparitor){
           }
           
         });
-        return;
+        //return;
       } else if(Array.isArray(range[1])){
-        return range[1].push([key,value,cb]);
+        range[1].push([key,value,cb]);
+      } else {
+        z._write(key,value,range[1],cb)
       }
-      z._write(key,value,range[1],cb)
-
     },
     _write:function(k,v,fd,cb){
       var z = this
